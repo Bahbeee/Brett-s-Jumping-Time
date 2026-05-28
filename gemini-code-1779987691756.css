@@ -1,0 +1,50 @@
+/* Color Palette & Custom School Branding Rules */
+.main-header {
+    background-color: #1a1a1a; 
+    border-bottom: 4px solid #bf1e2e;
+}
+
+.shadow-wrapper {
+    max-width: 750px;
+}
+
+.upload-dashbox {
+    border-style: dashed !important;
+}
+
+#btn-start {
+    background-color: #bf1e2e;
+}
+
+#btn-start:hover {
+    background-color: #9c1522;
+}
+
+#btn-stop {
+    background-color: #1a1a1a;
+}
+
+.audio-frame {
+    width: 206px; 
+    height: 206px;
+}
+
+.audio-active-pulse {
+    color: #bf1e2e !important;
+    text-shadow: 0 0 10px rgba(191, 30, 46, 0.6);
+    animation: pulse 1.5s infinite alternate;
+}
+
+.game-surface {
+    max-width: 100%;
+    image-rendering: pixelated;
+}
+
+.game-overlay {
+    z-index: 10;
+}
+
+@keyframes pulse {
+    from { transform: scale(1); }
+    to { transform: scale(1.1); }
+}
