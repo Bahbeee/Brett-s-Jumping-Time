@@ -36,12 +36,15 @@ async function init() {
     }
 
     try {
+        // Load the zip file using JSZip
         const zip = await JSZip.loadAsync(zipFile);
-        let modelJsonEntry, metadataJsonEntry;
+        let modelJsonEntry, metadataJsonEntry, weightsBinEntry;
 
+        // Locate files inside the zip package
         zip.forEach((relativePath, fileEntry) => {
             if (relativePath.endsWith("model.json")) modelJsonEntry = fileEntry;
             if (relativePath.endsWith("metadata.json")) metadataJsonEntry = fileEntry;
+            if (relativePath.endsWith("weights.bin")) weightsBinEntry = fileEntry;
         });
 
         if (!modelJsonEntry || !metadataJsonEntry) {
@@ -49,34 +52,52 @@ async function init() {
             return;
         }
 
+        // Read files out of the zip archive with their correct data formats
         const modelJsonText = await modelJsonEntry.async("string");
         const metadataJsonText = await metadataJsonEntry.async("string");
+        
+        let weightsBlobURL = null;
+        if (weightsBinEntry) {
+            const weightsBinBlob = await weightsBinEntry.async("blob");
+            weightsBlobURL = URL.createObjectURL(weightsBinBlob);
+        }
 
-        // Convert raw text entries into functional JSON objects
-        const modelTopologyAndWeights = JSON.parse(modelJsonText);
-        const manifestMetadata = JSON.parse(metadataJsonText);
+        // Parse JSON files to interact with data structure
+        const modelTopology = JSON.parse(modelJsonText);
+        const metadataJson = JSON.parse(metadataJsonText);
 
-        // Turn raw text back into native web blobs for the audio loader
         const modelBlob = new Blob([modelJsonText], { type: "application/json" });
         const metadataBlob = new Blob([metadataJsonText], { type: "application/json" });
 
-        const modelFile = new File([modelBlob], "model.json");
-        const metadataFile = new File([metadataBlob], "metadata.json");
+        const modelURL = URL.createObjectURL(modelBlob);
+        const metadataURL = URL.createObjectURL(metadataBlob);
 
-        // Initialize Google's Speech Recognizer Framework
+        // Standard speechCommands setup overrides to process raw local data URLs
         recognizer = speechCommands.create(
             "BROWSER_FFT", 
             undefined, 
-            modelFile, 
-            metadataFile
+            modelURL, 
+            metadataURL
         );
+
+        // Intercept network requests if speech-commands forces binary path searching
+        if (weightsBlobURL) {
+            const originalFetch = window.fetch;
+            window.fetch = async function(...args) {
+                const url = args[0];
+                if (typeof url === 'string' && url.includes('weights.bin')) {
+                    return originalFetch(weightsBlobURL);
+                }
+                return originalFetch(...args);
+            };
+        }
 
         await recognizer.ensureModelLoaded();
         maxPredictions = recognizer.wordLabels().length;
 
     } catch (error) {
         console.error(error);
-        alert("Failed to read audio files from archive. Make sure it's a valid open-source Web Audio file.");
+        alert("Failed to read audio files from archive. Make sure it's an uncorrupted Teachable Machine ZIP.");
         return;
     }
 
@@ -86,7 +107,7 @@ async function init() {
     document.getElementById('audio-status').classList.remove('text-muted');
     document.getElementById('audio-status').classList.add('text-danger', 'fw-bold');
 
-    // Build the Accuracy Layout
+    // Build the Accuracy Layout Dynamically based on unzipped names
     labelContainer = document.getElementById("label-container");
     labelContainer.innerHTML = "";
     const classNames = recognizer.wordLabels();
@@ -115,7 +136,7 @@ async function init() {
 
         const progressBar = document.createElement("div");
         progressBar.className = "progress-bar class-bar-fill";
-        progressBar.style.backgroundColor = "#bf1e2e"; // School Red Bars
+        progressBar.style.backgroundColor = "#bf1e2e"; // Westminster Red Bars
         progressBar.style.width = "0%";
         progressBar.style.transition = "width 0.05s ease-out"; 
 
@@ -126,7 +147,7 @@ async function init() {
         labelContainer.appendChild(rowDiv);
     }
 
-    // Run Real-Time Stream Capture Processing
+    // Run Real-Time Stream Capture Processing via mic graph
     recognizer.listen(result => {
         const scores = result.scores; // Returns array of match values
         
