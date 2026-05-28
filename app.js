@@ -27,62 +27,29 @@ let dino = {
 // 1. SPEECH COMMAND / AUDIO MODEL PROCESSING LOGIC
 // ---------------------------------------------------------
 async function init() {
-    const fileInput = document.getElementById('zip-selector');
-    const zipFile = fileInput.files[0];
-
-    if (!zipFile) {
-        alert("Please upload a valid model .zip file first.");
-        return;
-    }
+    // Show loading text while model stitches together
+    document.getElementById("label-container").innerHTML = "<div class='text-secondary small fw-bold anim-pulse'>Loading audio model files...</div>";
 
     try {
-        // 1. Load the zip file using JSZip
-        const zip = await JSZip.loadAsync(zipFile);
-        let modelJsonEntry, metadataJsonEntry, weightsBinEntry;
+        // Point directly to the model files sitting in your repository folder
+        const modelURL = "./model.json";
+        const metadataURL = "./metadata.json";
 
-        // Locate files inside the zip package
-        zip.forEach((relativePath, fileEntry) => {
-            if (relativePath.endsWith("model.json")) modelJsonEntry = fileEntry;
-            if (relativePath.endsWith("metadata.json")) metadataJsonEntry = fileEntry;
-            if (relativePath.endsWith("weights.bin")) weightsBinEntry = fileEntry;
-        });
+        // Create the Google Speech Recognizer
+        recognizer = speechCommands.create(
+            "BROWSER_FFT", 
+            undefined, 
+            modelURL, 
+            metadataURL
+        );
 
-        if (!modelJsonEntry || !metadataJsonEntry || !weightsBinEntry) {
-            alert("Error: Missing required files (model.json, metadata.json, or weights.bin) inside the zip.");
-            return;
-        }
-
-        // 2. Read files out of the zip archive as text or raw binary array buffers
-        const modelJsonText = await modelJsonEntry.async("string");
-        const metadataJsonText = await metadataJsonEntry.async("string");
-        const weightsBuffer = await weightsBinEntry.async("arraybuffer"); // Safely extract raw binary data
-
-        // Parse JSON files to interact with data structure
-        const modelTopologyAndManifest = JSON.parse(modelJsonText);
-        const metadataJson = JSON.parse(metadataJsonText);
-
-        // 3. Initialize the speech command framework standard instance
-        recognizer = speechCommands.create("BROWSER_FFT");
-
-        // 4. CRITICAL FIX: Bypass standard network string URLs entirely.
-        // We inject the unzipped topology structure and raw binary weights directly into the engine.
-        await recognizer.initialize({
-            modelTopology: modelTopologyAndManifest.modelTopology,
-            weightsManifest: [{
-                paths: ['./weights.bin'],
-                weights: modelTopologyAndManifest.weightsManifest[0].weights
-            }],
-            vocabulary: metadataJson.wordLabels
-        });
-
-        // Pass the raw extracted binary buffer straight into the loaded TensorFlow layers
-        await recognizer.model.loadWeights(weightsBuffer);
-
+        // Wait for the browser to fetch the files and look for weights.bin automatically
+        await recognizer.ensureModelLoaded();
         maxPredictions = recognizer.wordLabels().length;
 
     } catch (error) {
-        console.error("Cryptographic or loading engine failure details:", error);
-        alert("Failed to read audio files from archive. Make sure it's a valid uncorrupted Teachable Machine ZIP.");
+        console.error("Model loading details:", error);
+        alert("Failed to load the model. Make sure model.json, metadata.json, and weights.bin are uploaded to your repository.");
         return;
     }
 
@@ -92,7 +59,7 @@ async function init() {
     document.getElementById('audio-status').classList.remove('text-muted');
     document.getElementById('audio-status').classList.add('text-danger', 'fw-bold');
 
-    // Build the Accuracy Layout Dynamically based on unzipped names
+    // Build the Accuracy Bars layout based on your class labels
     labelContainer = document.getElementById("label-container");
     labelContainer.innerHTML = "";
     const classNames = recognizer.wordLabels();
@@ -132,9 +99,9 @@ async function init() {
         labelContainer.appendChild(rowDiv);
     }
 
-    // Run Real-Time Stream Capture Processing via mic graph
+    // Start listening to the microphone stream
     recognizer.listen(result => {
-        const scores = result.scores; // Returns array of match values
+        const scores = result.scores; // Match levels between 0.0 and 1.0
         
         for (let i = 0; i < maxPredictions; i++) {
             const rowDiv = labelContainer.childNodes[i];
@@ -145,7 +112,8 @@ async function init() {
             percentSpan.innerText = (probability * 100).toFixed(0) + "%";
             progressBar.style.width = (probability * 100) + "%";
 
-            // --- JUMP TRIGGER: Check Index 1 ("Class 2") ---
+            // --- AUDIO GAME JUMP TRIGGER ---
+            // If Index 1 ("Class 2") crosses 50% match probability, jump!
             if (i === 1 && probability > 0.50) {
                 dinoJump();
             }
@@ -157,7 +125,7 @@ async function init() {
         overlapFactor: 0.50
     });
 
-    // Fire Up Game Engine Components
+    // Start the game loop
     if (!gameRunning) {
         restartGame();
     }
