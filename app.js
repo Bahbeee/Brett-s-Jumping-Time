@@ -36,7 +36,7 @@ async function init() {
     }
 
     try {
-        // Load the zip file using JSZip
+        // 1. Load the zip file using JSZip
         const zip = await JSZip.loadAsync(zipFile);
         let modelJsonEntry, metadataJsonEntry, weightsBinEntry;
 
@@ -47,57 +47,42 @@ async function init() {
             if (relativePath.endsWith("weights.bin")) weightsBinEntry = fileEntry;
         });
 
-        if (!modelJsonEntry || !metadataJsonEntry) {
-            alert("Error: Missing required files (model.json or metadata.json) inside the zip.");
+        if (!modelJsonEntry || !metadataJsonEntry || !weightsBinEntry) {
+            alert("Error: Missing required files (model.json, metadata.json, or weights.bin) inside the zip.");
             return;
         }
 
-        // Read files out of the zip archive with their correct data formats
+        // 2. Read files out of the zip archive as text or raw binary array buffers
         const modelJsonText = await modelJsonEntry.async("string");
         const metadataJsonText = await metadataJsonEntry.async("string");
-        
-        let weightsBlobURL = null;
-        if (weightsBinEntry) {
-            const weightsBinBlob = await weightsBinEntry.async("blob");
-            weightsBlobURL = URL.createObjectURL(weightsBinBlob);
-        }
+        const weightsBuffer = await weightsBinEntry.async("arraybuffer"); // Safely extract raw binary data
 
         // Parse JSON files to interact with data structure
-        const modelTopology = JSON.parse(modelJsonText);
+        const modelTopologyAndManifest = JSON.parse(modelJsonText);
         const metadataJson = JSON.parse(metadataJsonText);
 
-        const modelBlob = new Blob([modelJsonText], { type: "application/json" });
-        const metadataBlob = new Blob([metadataJsonText], { type: "application/json" });
+        // 3. Initialize the speech command framework standard instance
+        recognizer = speechCommands.create("BROWSER_FFT");
 
-        const modelURL = URL.createObjectURL(modelBlob);
-        const metadataURL = URL.createObjectURL(metadataBlob);
+        // 4. CRITICAL FIX: Bypass standard network string URLs entirely.
+        // We inject the unzipped topology structure and raw binary weights directly into the engine.
+        await recognizer.initialize({
+            modelTopology: modelTopologyAndManifest.modelTopology,
+            weightsManifest: [{
+                paths: ['./weights.bin'],
+                weights: modelTopologyAndManifest.weightsManifest[0].weights
+            }],
+            vocabulary: metadataJson.wordLabels
+        });
 
-        // Standard speechCommands setup overrides to process raw local data URLs
-        recognizer = speechCommands.create(
-            "BROWSER_FFT", 
-            undefined, 
-            modelURL, 
-            metadataURL
-        );
+        // Pass the raw extracted binary buffer straight into the loaded TensorFlow layers
+        await recognizer.model.loadWeights(weightsBuffer);
 
-        // Intercept network requests if speech-commands forces binary path searching
-        if (weightsBlobURL) {
-            const originalFetch = window.fetch;
-            window.fetch = async function(...args) {
-                const url = args[0];
-                if (typeof url === 'string' && url.includes('weights.bin')) {
-                    return originalFetch(weightsBlobURL);
-                }
-                return originalFetch(...args);
-            };
-        }
-
-        await recognizer.ensureModelLoaded();
         maxPredictions = recognizer.wordLabels().length;
 
     } catch (error) {
-        console.error(error);
-        alert("Failed to read audio files from archive. Make sure it's an uncorrupted Teachable Machine ZIP.");
+        console.error("Cryptographic or loading engine failure details:", error);
+        alert("Failed to read audio files from archive. Make sure it's a valid uncorrupted Teachable Machine ZIP.");
         return;
     }
 
