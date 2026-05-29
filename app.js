@@ -26,14 +26,24 @@ let dino = {
 // 1. SPEECH COMMAND / AUDIO MODEL PROCESSING LOGIC
 // ---------------------------------------------------------
 async function init() {
-    document.getElementById("label-container").innerHTML = "<div class='text-secondary small fw-bold'>Loading audio model files...</div>";
+    // Change layout state immediately to prove the button works
+    const statusText = document.getElementById('audio-status');
+    if (statusText) {
+        statusText.innerText = "Attempting connection...";
+        statusText.className = "small text-warning fw-bold mt-2";
+    }
+
+    const container = document.getElementById("label-container");
+    if (container) {
+        container.innerHTML = "<div class='text-secondary small fw-bold'>Processing model matrix...</div>";
+    }
 
     try {
-        // Points exactly to your root filenames
+        // Pointing directly to your exact casing architecture
         const modelURL = "./model.json";
         const metadataURL = "./metadata.json";
 
-        // Create the Google Speech Recognizer
+        // Create the Google Speech Recognizer using absolute paths
         recognizer = speechCommands.create(
             "BROWSER_FFT", 
             undefined, 
@@ -41,86 +51,96 @@ async function init() {
             metadataURL
         );
 
-        // FORCE INTERCEPT: Even if the latest library asks for "weights.bin",
-        // we force it to look for your uppercase file "weights.BIN" on GitHub's servers.
-        const originalFetch = window.fetch;
-        window.fetch = async function(...args) {
-            const requestedUrl = args[0];
-            if (typeof requestedUrl === 'string' && requestedUrl.toLowerCase().includes('weights.bin')) {
-                console.log("Redirecting weights search to weights.BIN");
-                return originalFetch('./weights.BIN');
-            }
-            return originalFetch(...args);
-        };
+        // Fetch your uppercase weights file directly into browser memory ahead of time
+        const weightsResponse = await fetch('./weights.BIN');
+        if (!weightsResponse.ok) {
+            throw new Error("Could not find weights.BIN file on server.");
+        }
+        const weightsData = await weightsResponse.arrayBuffer();
 
-        // Load the model assets into memory
+        // Feed the structural blueprint configurations directly to the model layers
         await recognizer.ensureModelLoaded();
+        
+        // Inject your custom array buffer directly into the underlying layers
+        if (recognizer.model) {
+            await recognizer.model.loadWeights(weightsData);
+        }
+
         maxPredictions = recognizer.wordLabels().length;
 
-        // Restore default browser networking
-        window.fetch = originalFetch;
-
     } catch (error) {
-        console.error("Model initialization failure:", error);
-        alert("Failed to load the model. Check your file configurations.");
+        alert("Setup failed: " + error.message + "\nDouble check that model.json, metadata.json, and weights.BIN are present.");
+        if (statusText) {
+            statusText.innerText = "Connection Failed";
+            statusText.className = "small text-muted mt-2";
+        }
         return;
     }
 
-    // Update Status Indicators
-    document.getElementById('mic-icon').style.animation = "pulse 1.5s infinite";
-    document.getElementById('audio-status').innerText = "Listening...";
-    document.getElementById('audio-status').className = "small text-danger fw-bold mt-2";
-
-    labelContainer = document.getElementById("label-container");
-    labelContainer.innerHTML = "";
-    const classNames = recognizer.wordLabels();
-
-    for (let i = 0; i < maxPredictions; i++) {
-        const rowDiv = document.createElement("div");
-        rowDiv.className = "mb-3";
-
-        const labelHeader = document.createElement("div");
-        labelHeader.className = "d-flex justify-content-between mb-1 small fw-bold text-secondary";
-        
-        const nameSpan = document.createElement("span");
-        nameSpan.innerText = classNames[i];
-        
-        const percentSpan = document.createElement("span");
-        percentSpan.className = "class-percent";
-        percentSpan.innerText = "0%";
-
-        labelHeader.appendChild(nameSpan);
-        labelHeader.appendChild(percentSpan);
-
-        const progressContainer = document.createElement("div");
-        progressContainer.className = "progress";
-        progressContainer.style.height = "14px";
-
-        const progressBar = document.createElement("div");
-        progressBar.className = "progress-bar";
-        progressBar.style.backgroundColor = "#bf1e2e"; 
-        progressBar.style.width = "0%";
-
-        progressContainer.appendChild(progressBar);
-        rowDiv.appendChild(labelHeader);
-        rowDiv.appendChild(progressContainer);
-        
-        labelContainer.appendChild(rowDiv);
+    // Update Status Indicators on Success
+    const micIcon = document.getElementById('mic-icon');
+    if (micIcon) micIcon.style.animation = "pulse 1.5s infinite";
+    
+    if (statusText) {
+        statusText.innerText = "Listening...";
+        statusText.className = "small text-danger fw-bold mt-2";
     }
 
+    labelContainer = document.getElementById("label-container");
+    if (labelContainer) {
+        labelContainer.innerHTML = "";
+        const classNames = recognizer.wordLabels();
+
+        for (let i = 0; i < maxPredictions; i++) {
+            const rowDiv = document.createElement("div");
+            rowDiv.className = "mb-3";
+
+            const labelHeader = document.createElement("div");
+            labelHeader.className = "d-flex justify-content-between mb-1 small fw-bold text-secondary";
+            
+            const nameSpan = document.createElement("span");
+            nameSpan.innerText = classNames[i];
+            
+            const percentSpan = document.createElement("span");
+            percentSpan.className = "class-percent";
+            percentSpan.innerText = "0%";
+
+            labelHeader.appendChild(nameSpan);
+            labelHeader.appendChild(percentSpan);
+
+            const progressContainer = document.createElement("div");
+            progressContainer.className = "progress";
+            progressContainer.style.height = "14px";
+
+            const progressBar = document.createElement("div");
+            progressBar.className = "progress-bar";
+            progressBar.style.backgroundColor = "#bf1e2e"; 
+            progressBar.style.width = "0%";
+
+            progressContainer.appendChild(progressBar);
+            rowDiv.appendChild(labelHeader);
+            rowDiv.appendChild(progressContainer);
+            
+            labelContainer.appendChild(rowDiv);
+        }
+    }
+
+    // Fire up audio monitoring stream
     recognizer.listen(result => {
         const scores = result.scores; 
+        if (!labelContainer) return;
         
         for (let i = 0; i < maxPredictions; i++) {
             const rowDiv = labelContainer.childNodes[i];
+            if (!rowDiv) continue;
+            
             const percentSpan = rowDiv.querySelector(".class-percent");
             const progressBar = rowDiv.querySelector(".progress-bar");
             
             const probability = scores[i];
-            percentSpan.innerText = (probability * 100).toFixed(0) + "%";
-            progressBar.style.width = (probability * 100) + "%";
+            if (percentSpan) percentSpan.innerText = (probability * 100).toFixed(0) + "%";
+            if (progressBar) progressBar.style.width = (probability * 100) + "%";
 
-            // If Index 1 ("Class 2") crosses 50% match probability, trigger a jump!
             if (i === 1 && probability > 0.50) {
                 dinoJump();
             }
@@ -141,9 +161,14 @@ async function stop() {
     if (recognizer && recognizer.isListening()) {
         await recognizer.stopListening();
     }
-    document.getElementById('mic-icon').style.animation = "none";
-    document.getElementById('audio-status').innerText = "Microphone Off";
-    document.getElementById('audio-status').className = "small text-muted mt-2";
+    const micIcon = document.getElementById('mic-icon');
+    if (micIcon) micIcon.style.animation = "none";
+    
+    const statusText = document.getElementById('audio-status');
+    if (statusText) {
+        statusText.innerText = "Microphone Off";
+        statusText.className = "small text-muted mt-2";
+    }
     gameRunning = false; 
 }
 
@@ -204,4 +229,50 @@ function gameLoop() {
     ctx.fillText('Score: ' + Math.floor(score / 10), canvas.width - 100, 30);
 
     ctx.beginPath();
-    ctx.moveTo(0, canvas.height -
+    ctx.moveTo(0, canvas.height - 10);
+    ctx.lineTo(canvas.width, canvas.height - 10);
+    ctx.stroke();
+
+    requestAnimationFrame(gameLoop);
+}
+
+function dinoJump() {
+    if (dino.grounded && gameRunning) {
+        dino.dy = -dino.jumpPower;
+        dino.grounded = false;
+    }
+}
+
+function gameOver() {
+    gameRunning = false;
+    const overlay = document.getElementById('gameOverScreen');
+    if (overlay) overlay.classList.remove('d-none');
+    
+    const scoreVal = document.getElementById('finalScore');
+    if (scoreVal) scoreVal.innerText = Math.floor(score / 10);
+}
+
+function restartGame() {
+    dino.y = 110;
+    dino.dy = 0;
+    obstacles = [];
+    score = 0;
+    frames = 0;
+    
+    const overlay = document.getElementById('gameOverScreen');
+    if (overlay) overlay.classList.add('d-none');
+    
+    gameRunning = true;
+    gameLoop();
+}
+
+// Safety wrapper to guarantee elements are fully mounted on the DOM before event binding
+window.addEventListener('DOMContentLoaded', () => {
+    const startBtn = document.getElementById('btn-start');
+    const stopBtn = document.getElementById('btn-stop');
+    const restartBtn = document.getElementById('btn-restart');
+
+    if (startBtn) startBtn.addEventListener('click', init);
+    if (stopBtn) stopBtn.addEventListener('click', stop);
+    if (restartBtn) restartBtn.addEventListener('click', restartGame);
+});
