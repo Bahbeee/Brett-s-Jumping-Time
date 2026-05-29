@@ -27,13 +27,13 @@ let dino = {
 // 1. SPEECH COMMAND / AUDIO MODEL PROCESSING LOGIC
 // ---------------------------------------------------------
 async function init() {
-    // Show loading text while model stitches together
-    document.getElementById("label-container").innerHTML = "<div class='text-secondary small fw-bold anim-pulse'>Loading audio model files...</div>";
+    document.getElementById("label-container").innerHTML = "<div class='text-secondary small fw-bold'>Loading audio model files...</div>";
 
     try {
-        // Point directly to the model files sitting in your repository folder
-        const modelURL = "./model.json";
-        const metadataURL = "./metadata.json";
+        // MATCHING YOUR EXACT ROOT FILES:
+        // Points directly to the root files using your capitalized extensions
+        const modelURL = "./model.JSON";
+        const metadataURL = "./metadata.JSON";
 
         // Create the Google Speech Recognizer
         recognizer = speechCommands.create(
@@ -43,13 +43,27 @@ async function init() {
             metadataURL
         );
 
-        // Wait for the browser to fetch the files and look for weights.bin automatically
+        // Intercept fetch requests because the library will automatically try to find 
+        // a lowercase "weights.bin", but your file is named "weights.BIN"
+        const originalFetch = window.fetch;
+        window.fetch = async function(...args) {
+            const requestedUrl = args[0];
+            if (typeof requestedUrl === 'string' && requestedUrl.includes('weights.bin')) {
+                return originalFetch('./weights.BIN');
+            }
+            return originalFetch(...args);
+        };
+
+        // Load the assets into browser memory
         await recognizer.ensureModelLoaded();
         maxPredictions = recognizer.wordLabels().length;
 
+        // Restore the standard fetch function
+        window.fetch = originalFetch;
+
     } catch (error) {
         console.error("Model loading details:", error);
-        alert("Failed to load the model. Make sure model.json, metadata.json, and weights.bin are uploaded to your repository.");
+        alert("Failed to load the model. Make sure model.JSON, metadata.JSON, and weights.BIN are uploaded.");
         return;
     }
 
@@ -191,57 +205,4 @@ function gameLoop() {
         if (
             dino.x < obs.x + obs.w &&
             dino.x + dino.w > obs.x &&
-            dino.y < obs.y + obs.h &&
-            dino.y + dino.h > obs.y
-        ) {
-            gameOver();
-        }
-    }
-
-    obstacles = obstacles.filter(obs => obs.x + obs.w > 0);
-
-    score++;
-    ctx.fillStyle = '#000000';
-    ctx.font = 'bold 16px Arial';
-    ctx.fillText('Score: ' + Math.floor(score / 10), canvas.width - 100, 30);
-
-    // Baseline floor track line
-    ctx.beginPath();
-    ctx.moveTo(0, canvas.height - 10);
-    ctx.lineTo(canvas.width, canvas.height - 10);
-    ctx.stroke();
-
-    requestAnimationFrame(gameLoop);
-}
-
-function dinoJump() {
-    if (dino.grounded && gameRunning) {
-        dino.dy = -dino.jumpPower;
-        dino.grounded = false;
-    }
-}
-
-function gameOver() {
-    gameRunning = false;
-    document.getElementById('gameOverScreen').classList.remove('d-none');
-    document.getElementById('finalScore').innerText = Math.floor(score / 10);
-}
-
-function restartGame() {
-    dino.y = 110;
-    dino.dy = 0;
-    obstacles = [];
-    score = 0;
-    frames = 0;
-    
-    document.getElementById('gameOverScreen').classList.add('d-none');
-    gameRunning = true;
-    gameLoop();
-}
-
-// ---------------------------------------------------------
-// 3. SECURE DOM EVENT BINDINGS
-// ---------------------------------------------------------
-document.getElementById('btn-start').addEventListener('click', init);
-document.getElementById('btn-stop').addEventListener('click', stop);
-document.getElementById('btn-restart').addEventListener('click', restartGame);
+            dino.y < obs.y
