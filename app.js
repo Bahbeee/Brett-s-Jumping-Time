@@ -26,7 +26,6 @@ let dino = {
 // 1. SPEECH COMMAND / AUDIO MODEL PROCESSING LOGIC
 // ---------------------------------------------------------
 async function init() {
-    // Change layout state immediately to prove the button works
     const statusText = document.getElementById('audio-status');
     if (statusText) {
         statusText.innerText = "Attempting connection...";
@@ -39,11 +38,10 @@ async function init() {
     }
 
     try {
-        // Pointing directly to your exact casing architecture
         const modelURL = "./model.json";
         const metadataURL = "./metadata.json";
 
-        // Create the Google Speech Recognizer using absolute paths
+        // Create the Google Speech Recognizer using standard clean paths
         recognizer = speechCommands.create(
             "BROWSER_FFT", 
             undefined, 
@@ -51,25 +49,12 @@ async function init() {
             metadataURL
         );
 
-        // Fetch your uppercase weights file directly into browser memory ahead of time
-        const weightsResponse = await fetch('./weights.BIN');
-        if (!weightsResponse.ok) {
-            throw new Error("Could not find weights.BIN file on server.");
-        }
-        const weightsData = await weightsResponse.arrayBuffer();
-
-        // Feed the structural blueprint configurations directly to the model layers
+        // Load the model assets natively (this automatically grabs weights.bin)
         await recognizer.ensureModelLoaded();
-        
-        // Inject your custom array buffer directly into the underlying layers
-        if (recognizer.model) {
-            await recognizer.model.loadWeights(weightsData);
-        }
-
         maxPredictions = recognizer.wordLabels().length;
 
     } catch (error) {
-        alert("Setup failed: " + error.message + "\nDouble check that model.json, metadata.json, and weights.BIN are present.");
+        alert("Setup failed: " + error.message + "\nDouble check that model.json, metadata.json, and weights.bin are present and lowercase.");
         if (statusText) {
             statusText.innerText = "Connection Failed";
             statusText.className = "small text-muted mt-2";
@@ -141,6 +126,7 @@ async function init() {
             if (percentSpan) percentSpan.innerText = (probability * 100).toFixed(0) + "%";
             if (progressBar) progressBar.style.width = (probability * 100) + "%";
 
+            // When Class 2 crosses 50% match probability, trigger a jump!
             if (i === 1 && probability > 0.50) {
                 dinoJump();
             }
@@ -266,13 +252,4 @@ function restartGame() {
     gameLoop();
 }
 
-// Safety wrapper to guarantee elements are fully mounted on the DOM before event binding
-window.addEventListener('DOMContentLoaded', () => {
-    const startBtn = document.getElementById('btn-start');
-    const stopBtn = document.getElementById('btn-stop');
-    const restartBtn = document.getElementById('btn-restart');
-
-    if (startBtn) startBtn.addEventListener('click', init);
-    if (stopBtn) stopBtn.addEventListener('click', stop);
-    if (restartBtn) restartBtn.addEventListener('click', restartGame);
-});
+window.addEventListener('DOMContentLoaded',
