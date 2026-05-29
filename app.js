@@ -11,7 +11,6 @@ let score = 0;
 let frames = 0;
 let obstacles = [];
 
-// Dino Character Physics Mapping
 let dino = {
     x: 50,
     y: 110,
@@ -30,12 +29,10 @@ async function init() {
     document.getElementById("label-container").innerHTML = "<div class='text-secondary small fw-bold'>Loading audio model files...</div>";
 
     try {
-        // MATCHING YOUR EXACT ROOT FILES:
-        // Points directly to the root files using your capitalized extensions
-        const modelURL = "./model.JSON";
-        const metadataURL = "./metadata.JSON";
+        // MATCHING YOUR FILE ARCHITECTURE EXACTLY
+        const modelURL = "./model.json";
+        const metadataURL = "./metadata.json";
 
-        // Create the Google Speech Recognizer
         recognizer = speechCommands.create(
             "BROWSER_FFT", 
             undefined, 
@@ -43,8 +40,7 @@ async function init() {
             metadataURL
         );
 
-        // Intercept fetch requests because the library will automatically try to find 
-        // a lowercase "weights.bin", but your file is named "weights.BIN"
+        // Network proxy redirector to handle capitalized weights.BIN file on GitHub
         const originalFetch = window.fetch;
         window.fetch = async function(...args) {
             const requestedUrl = args[0];
@@ -54,26 +50,23 @@ async function init() {
             return originalFetch(...args);
         };
 
-        // Load the assets into browser memory
         await recognizer.ensureModelLoaded();
         maxPredictions = recognizer.wordLabels().length;
 
-        // Restore the standard fetch function
+        // Restore default browser networking
         window.fetch = originalFetch;
 
     } catch (error) {
-        console.error("Model loading details:", error);
-        alert("Failed to load the model. Make sure model.JSON, metadata.JSON, and weights.BIN are uploaded.");
+        console.error("Model initialization failure analysis:", error);
+        alert("Failed to load the model. Check your browser's inspect element console logs.");
         return;
     }
 
     // Update Status Indicators
-    document.getElementById('mic-icon').classList.add('audio-active-pulse');
+    document.getElementById('mic-icon').style.animation = "pulse 1.5s infinite";
     document.getElementById('audio-status').innerText = "Listening...";
-    document.getElementById('audio-status').classList.remove('text-muted');
-    document.getElementById('audio-status').classList.add('text-danger', 'fw-bold');
+    document.getElementById('audio-status').className = "small text-danger fw-bold mt-2";
 
-    // Build the Accuracy Bars layout based on your class labels
     labelContainer = document.getElementById("label-container");
     labelContainer.innerHTML = "";
     const classNames = recognizer.wordLabels();
@@ -86,7 +79,6 @@ async function init() {
         labelHeader.className = "d-flex justify-content-between mb-1 small fw-bold text-secondary";
         
         const nameSpan = document.createElement("span");
-        nameSpan.className = "class-name";
         nameSpan.innerText = classNames[i];
         
         const percentSpan = document.createElement("span");
@@ -101,10 +93,9 @@ async function init() {
         progressContainer.style.height = "14px";
 
         const progressBar = document.createElement("div");
-        progressBar.className = "progress-bar class-bar-fill";
-        progressBar.style.backgroundColor = "#bf1e2e"; // Westminster Red Bars
+        progressBar.className = "progress-bar";
+        progressBar.style.backgroundColor = "#bf1e2e"; 
         progressBar.style.width = "0%";
-        progressBar.style.transition = "width 0.05s ease-out"; 
 
         progressContainer.appendChild(progressBar);
         rowDiv.appendChild(labelHeader);
@@ -113,20 +104,18 @@ async function init() {
         labelContainer.appendChild(rowDiv);
     }
 
-    // Start listening to the microphone stream
     recognizer.listen(result => {
-        const scores = result.scores; // Match levels between 0.0 and 1.0
+        const scores = result.scores; 
         
         for (let i = 0; i < maxPredictions; i++) {
             const rowDiv = labelContainer.childNodes[i];
             const percentSpan = rowDiv.querySelector(".class-percent");
-            const progressBar = rowDiv.querySelector(".class-bar-fill");
+            const progressBar = rowDiv.querySelector(".progress-bar");
             
             const probability = scores[i];
             percentSpan.innerText = (probability * 100).toFixed(0) + "%";
             progressBar.style.width = (probability * 100) + "%";
 
-            // --- AUDIO GAME JUMP TRIGGER ---
             // If Index 1 ("Class 2") crosses 50% match probability, jump!
             if (i === 1 && probability > 0.50) {
                 dinoJump();
@@ -139,7 +128,6 @@ async function init() {
         overlapFactor: 0.50
     });
 
-    // Start the game loop
     if (!gameRunning) {
         restartGame();
     }
@@ -149,9 +137,7 @@ async function stop() {
     if (recognizer && recognizer.isListening()) {
         await recognizer.stopListening();
     }
-    
-    // Reset indicators
-    document.getElementById('mic-icon').classList.remove('audio-active-pulse');
+    document.getElementById('mic-icon').style.animation = "none";
     document.getElementById('audio-status').innerText = "Microphone Off";
     document.getElementById('audio-status').className = "small text-muted mt-2";
     gameRunning = false; 
@@ -165,24 +151,20 @@ function gameLoop() {
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Apply basic downward gravity
     dino.dy += dino.gravity;
     dino.y += dino.dy;
 
-    // Floor contact threshold limits
     if (dino.y + dino.h >= canvas.height - 10) {
         dino.y = canvas.height - dino.h - 10;
         dino.dy = 0;
         dino.grounded = true;
     }
 
-    // Paint Dino (School Red Block)
     ctx.fillStyle = '#bf1e2e';
     ctx.fillRect(dino.x, dino.y, dino.w, dino.h);
 
     frames++;
     
-    // Spawn Obstacles on randomized timing limits
     if (frames % Math.floor(Math.random() * 50 + 70) === 0) {
         obstacles.push({
             x: canvas.width,
@@ -193,16 +175,62 @@ function gameLoop() {
         });
     }
 
-    // Draw and animate obstacles
     for (let i = 0; i < obstacles.length; i++) {
         let obs = obstacles[i];
         obs.x -= obs.speed;
         
-        ctx.fillStyle = '#1a1a1a'; // Dark Gray Obstacles
+        ctx.fillStyle = '#1a1a1a'; 
         ctx.fillRect(obs.x, obs.y, obs.w, obs.h);
 
-        // Standard bounding box collision verification rule (AABB)
         if (
             dino.x < obs.x + obs.w &&
             dino.x + dino.w > obs.x &&
-            dino.y < obs.y
+            dino.y < obs.y + obs.h &&
+            dino.y + dino.h > obs.y
+        ) {
+            gameOver();
+        }
+    }
+
+    obstacles = obstacles.filter(obs => obs.x + obs.w > 0);
+
+    score++;
+    ctx.fillStyle = '#000000';
+    ctx.font = 'bold 16px Arial';
+    ctx.fillText('Score: ' + Math.floor(score / 10), canvas.width - 100, 30);
+
+    ctx.beginPath();
+    ctx.moveTo(0, canvas.height - 10);
+    ctx.lineTo(canvas.width, canvas.height - 10);
+    ctx.stroke();
+
+    requestAnimationFrame(gameLoop);
+}
+
+function dinoJump() {
+    if (dino.grounded && gameRunning) {
+        dino.dy = -dino.jumpPower;
+        dino.grounded = false;
+    }
+}
+
+function gameOver() {
+    gameRunning = false;
+    document.getElementById('gameOverScreen').classList.remove('d-none');
+    document.getElementById('finalScore').innerText = Math.floor(score / 10);
+}
+
+function restartGame() {
+    dino.y = 110;
+    dino.dy = 0;
+    obstacles = [];
+    score = 0;
+    frames = 0;
+    document.getElementById('gameOverScreen').classList.add('d-none');
+    gameRunning = true;
+    gameLoop();
+}
+
+document.getElementById('btn-start').addEventListener('click', init);
+document.getElementById('btn-stop').addEventListener('click', stop);
+document.getElementById('btn-restart').addEventListener('click', restartGame);
