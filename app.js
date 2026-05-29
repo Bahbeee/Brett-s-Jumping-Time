@@ -26,22 +26,24 @@ let dino = {
 // 1. SPEECH COMMAND / AUDIO MODEL PROCESSING LOGIC
 // ---------------------------------------------------------
 async function init() {
-    const statusText = document.getElementById('audio-status');
-    if (statusText) {
-        statusText.innerText = "Attempting connection...";
-        statusText.className = "small text-warning fw-bold mt-2";
+    // VISUAL SAFEGUARD: Force the button to change instantly to prove it is alive!
+    const startBtn = document.getElementById('btn-start');
+    if (startBtn) {
+        startBtn.innerText = "Connecting...";
+        startBtn.style.backgroundColor = "#e0a800"; // Shifts color to yellow
     }
 
-    const container = document.getElementById("label-container");
-    if (container) {
-        container.innerHTML = "<div class='text-secondary small fw-bold'>Processing model matrix...</div>";
+    const statusText = document.getElementById('audio-status');
+    if (statusText) {
+        statusText.innerText = "Loading setup arrays...";
+        statusText.className = "small text-warning fw-bold mt-2";
     }
 
     try {
         const modelURL = "./model.json";
         const metadataURL = "./metadata.json";
 
-        // Create the Google Speech Recognizer using standard clean paths
+        // Create Google Speech framework interface
         recognizer = speechCommands.create(
             "BROWSER_FFT", 
             undefined, 
@@ -49,20 +51,29 @@ async function init() {
             metadataURL
         );
 
-        // Load the model assets natively (this automatically grabs weights.bin)
+        // Load files from your root folder natively
         await recognizer.ensureModelLoaded();
         maxPredictions = recognizer.wordLabels().length;
 
     } catch (error) {
-        alert("Setup failed: " + error.message + "\nDouble check that model.json, metadata.json, and weights.bin are present and lowercase.");
+        alert("Loading Error:\n" + error.message);
+        if (startBtn) {
+            startBtn.innerText = "Start Microphone & Game";
+            startBtn.style.backgroundColor = "#bf1e2e";
+        }
         if (statusText) {
-            statusText.innerText = "Connection Failed";
+            statusText.innerText = "Failed to launch";
             statusText.className = "small text-muted mt-2";
         }
         return;
     }
 
     // Update Status Indicators on Success
+    if (startBtn) {
+        startBtn.innerText = "Model Active";
+        startBtn.style.backgroundColor = "#28a745"; // Shifts to green
+    }
+
     const micIcon = document.getElementById('mic-icon');
     if (micIcon) micIcon.style.animation = "pulse 1.5s infinite";
     
@@ -110,7 +121,7 @@ async function init() {
         }
     }
 
-    // Fire up audio monitoring stream
+    // Listen to incoming sound stream
     recognizer.listen(result => {
         const scores = result.scores; 
         if (!labelContainer) return;
@@ -126,7 +137,6 @@ async function init() {
             if (percentSpan) percentSpan.innerText = (probability * 100).toFixed(0) + "%";
             if (progressBar) progressBar.style.width = (probability * 100) + "%";
 
-            // When Class 2 crosses 50% match probability, trigger a jump!
             if (i === 1 && probability > 0.50) {
                 dinoJump();
             }
@@ -146,6 +156,11 @@ async function init() {
 async function stop() {
     if (recognizer && recognizer.isListening()) {
         await recognizer.stopListening();
+    }
+    const startBtn = document.getElementById('btn-start');
+    if (startBtn) {
+        startBtn.innerText = "Start Microphone & Game";
+        startBtn.style.backgroundColor = "#bf1e2e";
     }
     const micIcon = document.getElementById('mic-icon');
     if (micIcon) micIcon.style.animation = "none";
@@ -252,4 +267,7 @@ function restartGame() {
     gameLoop();
 }
 
-window.addEventListener('DOMContentLoaded',
+// Clean event mapping layout
+document.getElementById('btn-start').addEventListener('click', init);
+document.getElementById('btn-stop').addEventListener('click', stop);
+document.getElementById('btn-restart').addEventListener('click', restartGame);
