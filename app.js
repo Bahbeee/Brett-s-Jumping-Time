@@ -29,10 +29,11 @@ async function init() {
     document.getElementById("label-container").innerHTML = "<div class='text-secondary small fw-bold'>Loading audio model files...</div>";
 
     try {
-        // MATCHING YOUR FILE ARCHITECTURE EXACTLY
+        // Points exactly to your root filenames
         const modelURL = "./model.json";
         const metadataURL = "./metadata.json";
 
+        // Create the Google Speech Recognizer
         recognizer = speechCommands.create(
             "BROWSER_FFT", 
             undefined, 
@@ -40,16 +41,19 @@ async function init() {
             metadataURL
         );
 
-        // Network proxy redirector to handle capitalized weights.BIN file on GitHub
+        // FORCE INTERCEPT: Even if the latest library asks for "weights.bin",
+        // we force it to look for your uppercase file "weights.BIN" on GitHub's servers.
         const originalFetch = window.fetch;
         window.fetch = async function(...args) {
             const requestedUrl = args[0];
-            if (typeof requestedUrl === 'string' && requestedUrl.includes('weights.bin')) {
+            if (typeof requestedUrl === 'string' && requestedUrl.toLowerCase().includes('weights.bin')) {
+                console.log("Redirecting weights search to weights.BIN");
                 return originalFetch('./weights.BIN');
             }
             return originalFetch(...args);
         };
 
+        // Load the model assets into memory
         await recognizer.ensureModelLoaded();
         maxPredictions = recognizer.wordLabels().length;
 
@@ -57,8 +61,8 @@ async function init() {
         window.fetch = originalFetch;
 
     } catch (error) {
-        console.error("Model initialization failure analysis:", error);
-        alert("Failed to load the model. Check your browser's inspect element console logs.");
+        console.error("Model initialization failure:", error);
+        alert("Failed to load the model. Check your file configurations.");
         return;
     }
 
@@ -116,7 +120,7 @@ async function init() {
             percentSpan.innerText = (probability * 100).toFixed(0) + "%";
             progressBar.style.width = (probability * 100) + "%";
 
-            // If Index 1 ("Class 2") crosses 50% match probability, jump!
+            // If Index 1 ("Class 2") crosses 50% match probability, trigger a jump!
             if (i === 1 && probability > 0.50) {
                 dinoJump();
             }
@@ -200,37 +204,4 @@ function gameLoop() {
     ctx.fillText('Score: ' + Math.floor(score / 10), canvas.width - 100, 30);
 
     ctx.beginPath();
-    ctx.moveTo(0, canvas.height - 10);
-    ctx.lineTo(canvas.width, canvas.height - 10);
-    ctx.stroke();
-
-    requestAnimationFrame(gameLoop);
-}
-
-function dinoJump() {
-    if (dino.grounded && gameRunning) {
-        dino.dy = -dino.jumpPower;
-        dino.grounded = false;
-    }
-}
-
-function gameOver() {
-    gameRunning = false;
-    document.getElementById('gameOverScreen').classList.remove('d-none');
-    document.getElementById('finalScore').innerText = Math.floor(score / 10);
-}
-
-function restartGame() {
-    dino.y = 110;
-    dino.dy = 0;
-    obstacles = [];
-    score = 0;
-    frames = 0;
-    document.getElementById('gameOverScreen').classList.add('d-none');
-    gameRunning = true;
-    gameLoop();
-}
-
-document.getElementById('btn-start').addEventListener('click', init);
-document.getElementById('btn-stop').addEventListener('click', stop);
-document.getElementById('btn-restart').addEventListener('click', restartGame);
+    ctx.moveTo(0, canvas.height -
