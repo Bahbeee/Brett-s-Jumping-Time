@@ -26,16 +26,15 @@ let dino = {
 // 1. SPEECH COMMAND / AUDIO MODEL PROCESSING LOGIC
 // ---------------------------------------------------------
 async function init() {
-    // VISUAL SAFEGUARD: Force the button to change instantly to prove it is alive!
     const startBtn = document.getElementById('btn-start');
     if (startBtn) {
         startBtn.innerText = "Connecting...";
-        startBtn.style.backgroundColor = "#e0a800"; // Shifts color to yellow
+        startBtn.style.backgroundColor = "#e0a800"; 
     }
 
     const statusText = document.getElementById('audio-status');
     if (statusText) {
-        statusText.innerText = "Loading setup arrays...";
+        statusText.innerText = "Loading model files...";
         statusText.className = "small text-warning fw-bold mt-2";
     }
 
@@ -43,7 +42,7 @@ async function init() {
         const modelURL = "./model.json";
         const metadataURL = "./metadata.json";
 
-        // Create Google Speech framework interface
+        // Create Google Speech framework interface natively
         recognizer = speechCommands.create(
             "BROWSER_FFT", 
             undefined, 
@@ -51,7 +50,7 @@ async function init() {
             metadataURL
         );
 
-        // Load files from your root folder natively
+        // Load files natively
         await recognizer.ensureModelLoaded();
         maxPredictions = recognizer.wordLabels().length;
 
@@ -71,7 +70,7 @@ async function init() {
     // Update Status Indicators on Success
     if (startBtn) {
         startBtn.innerText = "Model Active";
-        startBtn.style.backgroundColor = "#28a745"; // Shifts to green
+        startBtn.style.backgroundColor = "#28a745"; 
     }
 
     const micIcon = document.getElementById('mic-icon');
@@ -121,7 +120,7 @@ async function init() {
         }
     }
 
-    // Listen to incoming sound stream
+    // Monitor microphone stream frequencies
     recognizer.listen(result => {
         const scores = result.scores; 
         if (!labelContainer) return;
@@ -267,7 +266,12 @@ function restartGame() {
     gameLoop();
 }
 
-// Clean event mapping layout
-document.getElementById('btn-start').addEventListener('click', init);
-document.getElementById('btn-stop').addEventListener('click', stop);
-document.getElementById('btn-restart').addEventListener('click', restartGame);
+window.addEventListener('DOMContentLoaded', () => {
+    const startBtn = document.getElementById('btn-start');
+    const stopBtn = document.getElementById('btn-stop');
+    const restartBtn = document.getElementById('btn-restart');
+
+    if (startBtn) startBtn.addEventListener('click', init);
+    if (stopBtn) stopBtn.addEventListener('click', stop);
+    if (restartBtn) restartBtn.addEventListener('click', restartGame);
+});
