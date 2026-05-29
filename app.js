@@ -26,23 +26,18 @@ let dino = {
 // 1. SPEECH COMMAND / AUDIO MODEL PROCESSING LOGIC
 // ---------------------------------------------------------
 async function init() {
-    const startBtn = document.getElementById('btn-start');
-    if (startBtn) {
-        startBtn.innerText = "Connecting...";
-        startBtn.style.backgroundColor = "#e0a800"; 
-    }
+    // FORCE COLOR SHIFT IMMEDIATELY
+    document.getElementById('btn-start').innerText = "Connecting...";
+    document.getElementById('btn-start').style.backgroundColor = "#e0a800"; 
 
-    const statusText = document.getElementById('audio-status');
-    if (statusText) {
-        statusText.innerText = "Loading model files...";
-        statusText.className = "small text-warning fw-bold mt-2";
-    }
+    document.getElementById('audio-status').innerText = "Loading model...";
+    document.getElementById('audio-status').className = "small text-warning fw-bold mt-2";
 
     try {
         const modelURL = "./model.json";
         const metadataURL = "./metadata.json";
 
-        // Create Google Speech framework interface natively
+        // Create Google Speech framework natively
         recognizer = speechCommands.create(
             "BROWSER_FFT", 
             undefined, 
@@ -56,74 +51,61 @@ async function init() {
 
     } catch (error) {
         alert("Loading Error:\n" + error.message);
-        if (startBtn) {
-            startBtn.innerText = "Start Microphone & Game";
-            startBtn.style.backgroundColor = "#bf1e2e";
-        }
-        if (statusText) {
-            statusText.innerText = "Failed to launch";
-            statusText.className = "small text-muted mt-2";
-        }
+        document.getElementById('btn-start').innerText = "Start Microphone & Game";
+        document.getElementById('btn-start').style.backgroundColor = "#bf1e2e";
+        document.getElementById('audio-status').innerText = "Failed to launch";
+        document.getElementById('audio-status').className = "small text-muted mt-2";
         return;
     }
 
     // Update Status Indicators on Success
-    if (startBtn) {
-        startBtn.innerText = "Model Active";
-        startBtn.style.backgroundColor = "#28a745"; 
-    }
+    document.getElementById('btn-start').innerText = "Model Active";
+    document.getElementById('btn-start').style.backgroundColor = "#28a745"; 
 
-    const micIcon = document.getElementById('mic-icon');
-    if (micIcon) micIcon.style.animation = "pulse 1.5s infinite";
-    
-    if (statusText) {
-        statusText.innerText = "Listening...";
-        statusText.className = "small text-danger fw-bold mt-2";
-    }
+    document.getElementById('mic-icon').style.animation = "pulse 1.5s infinite";
+    document.getElementById('audio-status').innerText = "Listening...";
+    document.getElementById('audio-status').className = "small text-danger fw-bold mt-2";
 
     labelContainer = document.getElementById("label-container");
-    if (labelContainer) {
-        labelContainer.innerHTML = "";
-        const classNames = recognizer.wordLabels();
+    labelContainer.innerHTML = "";
+    const classNames = recognizer.wordLabels();
 
-        for (let i = 0; i < maxPredictions; i++) {
-            const rowDiv = document.createElement("div");
-            rowDiv.className = "mb-3";
+    for (let i = 0; i < maxPredictions; i++) {
+        const rowDiv = document.createElement("div");
+        rowDiv.className = "mb-3";
 
-            const labelHeader = document.createElement("div");
-            labelHeader.className = "d-flex justify-content-between mb-1 small fw-bold text-secondary";
-            
-            const nameSpan = document.createElement("span");
-            nameSpan.innerText = classNames[i];
-            
-            const percentSpan = document.createElement("span");
-            percentSpan.className = "class-percent";
-            percentSpan.innerText = "0%";
+        const labelHeader = document.createElement("div");
+        labelHeader.className = "d-flex justify-content-between mb-1 small fw-bold text-secondary";
+        
+        const nameSpan = document.createElement("span");
+        nameSpan.innerText = classNames[i];
+        
+        const percentSpan = document.createElement("span");
+        percentSpan.className = "class-percent";
+        percentSpan.innerText = "0%";
 
-            labelHeader.appendChild(nameSpan);
-            labelHeader.appendChild(percentSpan);
+        labelHeader.appendChild(nameSpan);
+        labelHeader.appendChild(percentSpan);
 
-            const progressContainer = document.createElement("div");
-            progressContainer.className = "progress";
-            progressContainer.style.height = "14px";
+        const progressContainer = document.createElement("div");
+        progressContainer.className = "progress";
+        progressContainer.style.height = "14px";
 
-            const progressBar = document.createElement("div");
-            progressBar.className = "progress-bar";
-            progressBar.style.backgroundColor = "#bf1e2e"; 
-            progressBar.style.width = "0%";
+        const progressBar = document.createElement("div");
+        progressBar.className = "progress-bar";
+        progressBar.style.backgroundColor = "#bf1e2e"; 
+        progressBar.style.width = "0%";
 
-            progressContainer.appendChild(progressBar);
-            rowDiv.appendChild(labelHeader);
-            rowDiv.appendChild(progressContainer);
-            
-            labelContainer.appendChild(rowDiv);
-        }
+        progressContainer.appendChild(progressBar);
+        rowDiv.appendChild(labelHeader);
+        rowDiv.appendChild(progressContainer);
+        
+        labelContainer.appendChild(rowDiv);
     }
 
     // Monitor microphone stream frequencies
     recognizer.listen(result => {
         const scores = result.scores; 
-        if (!labelContainer) return;
         
         for (let i = 0; i < maxPredictions; i++) {
             const rowDiv = labelContainer.childNodes[i];
@@ -156,19 +138,11 @@ async function stop() {
     if (recognizer && recognizer.isListening()) {
         await recognizer.stopListening();
     }
-    const startBtn = document.getElementById('btn-start');
-    if (startBtn) {
-        startBtn.innerText = "Start Microphone & Game";
-        startBtn.style.backgroundColor = "#bf1e2e";
-    }
-    const micIcon = document.getElementById('mic-icon');
-    if (micIcon) micIcon.style.animation = "none";
-    
-    const statusText = document.getElementById('audio-status');
-    if (statusText) {
-        statusText.innerText = "Microphone Off";
-        statusText.className = "small text-muted mt-2";
-    }
+    document.getElementById('btn-start').innerText = "Start Microphone & Game";
+    document.getElementById('btn-start').style.backgroundColor = "#bf1e2e";
+    document.getElementById('mic-icon').style.animation = "none";
+    document.getElementById('audio-status').innerText = "Microphone Off";
+    document.getElementById('audio-status').className = "small text-muted mt-2";
     gameRunning = false; 
 }
 
@@ -245,11 +219,8 @@ function dinoJump() {
 
 function gameOver() {
     gameRunning = false;
-    const overlay = document.getElementById('gameOverScreen');
-    if (overlay) overlay.classList.remove('d-none');
-    
-    const scoreVal = document.getElementById('finalScore');
-    if (scoreVal) scoreVal.innerText = Math.floor(score / 10);
+    document.getElementById('gameOverScreen').classList.remove('d-none');
+    document.getElementById('finalScore').innerText = Math.floor(score / 10);
 }
 
 function restartGame() {
@@ -258,20 +229,12 @@ function restartGame() {
     obstacles = [];
     score = 0;
     frames = 0;
-    
-    const overlay = document.getElementById('gameOverScreen');
-    if (overlay) overlay.classList.add('d-none');
-    
+    document.getElementById('gameOverScreen').classList.add('d-none');
     gameRunning = true;
     gameLoop();
 }
 
-window.addEventListener('DOMContentLoaded', () => {
-    const startBtn = document.getElementById('btn-start');
-    const stopBtn = document.getElementById('btn-stop');
-    const restartBtn = document.getElementById('btn-restart');
-
-    if (startBtn) startBtn.addEventListener('click', init);
-    if (stopBtn) stopBtn.addEventListener('click', stop);
-    if (restartBtn) restartBtn.addEventListener('click', restartGame);
-});
+// BIND DIRECTLY RIGHT NOW
+document.getElementById('btn-start').onclick = init;
+document.getElementById('btn-stop').onclick = stop;
+document.getElementById('btn-restart').onclick = restartGame;
