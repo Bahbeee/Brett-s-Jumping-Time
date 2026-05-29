@@ -1,273 +1,60 @@
-// --- Audio Teachable Machine Global Variables ---
-let recognizer;
-let labelContainer;
-let maxPredictions;
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WHS Lions - Audio Teachable Machine & Dino Game</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-light">
 
-// --- Game Engine Global Variables ---
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
-let gameRunning = false;
-let score = 0;
-let frames = 0;
-let obstacles = [];
+<header class="text-white p-3 d-flex justify-content-between align-items-center shadow-sm main-header" style="background-color: #bf1e2e;">
+    <h1 class="h4 m-0 fw-bold">Westminster High School</h1>
+    <span class="small text-white-50 fst-italic">Home of the Lions</span>
+</header>
 
-let dino = {
-    x: 50,
-    y: 110,
-    w: 20,
-    h: 40,
-    dy: 0,
-    jumpPower: 10,
-    gravity: 0.6,
-    grounded: true
-};
-
-// ---------------------------------------------------------
-// 1. SPEECH COMMAND / AUDIO MODEL PROCESSING LOGIC
-// ---------------------------------------------------------
-async function init() {
-    // VISUAL SAFEGUARD: Force the button to change instantly to prove it is alive!
-    const startBtn = document.getElementById('btn-start');
-    if (startBtn) {
-        startBtn.innerText = "Connecting...";
-        startBtn.style.backgroundColor = "#e0a800"; // Shifts color to yellow
-    }
-
-    const statusText = document.getElementById('audio-status');
-    if (statusText) {
-        statusText.innerText = "Loading setup arrays...";
-        statusText.className = "small text-warning fw-bold mt-2";
-    }
-
-    try {
-        const modelURL = "./model.json";
-        const metadataURL = "./metadata.json";
-
-        // Create Google Speech framework interface
-        recognizer = speechCommands.create(
-            "BROWSER_FFT", 
-            undefined, 
-            modelURL, 
-            metadataURL
-        );
-
-        // Load files from your root folder natively
-        await recognizer.ensureModelLoaded();
-        maxPredictions = recognizer.wordLabels().length;
-
-    } catch (error) {
-        alert("Loading Error:\n" + error.message);
-        if (startBtn) {
-            startBtn.innerText = "Start Microphone & Game";
-            startBtn.style.backgroundColor = "#bf1e2e";
-        }
-        if (statusText) {
-            statusText.innerText = "Failed to launch";
-            statusText.className = "small text-muted mt-2";
-        }
-        return;
-    }
-
-    // Update Status Indicators on Success
-    if (startBtn) {
-        startBtn.innerText = "Model Active";
-        startBtn.style.backgroundColor = "#28a745"; // Shifts to green
-    }
-
-    const micIcon = document.getElementById('mic-icon');
-    if (micIcon) micIcon.style.animation = "pulse 1.5s infinite";
-    
-    if (statusText) {
-        statusText.innerText = "Listening...";
-        statusText.className = "small text-danger fw-bold mt-2";
-    }
-
-    labelContainer = document.getElementById("label-container");
-    if (labelContainer) {
-        labelContainer.innerHTML = "";
-        const classNames = recognizer.wordLabels();
-
-        for (let i = 0; i < maxPredictions; i++) {
-            const rowDiv = document.createElement("div");
-            rowDiv.className = "mb-3";
-
-            const labelHeader = document.createElement("div");
-            labelHeader.className = "d-flex justify-content-between mb-1 small fw-bold text-secondary";
+<main class="container my-5">
+    <div class="card shadow border-0">
+        <div class="card-body p-4">
             
-            const nameSpan = document.createElement("span");
-            nameSpan.innerText = classNames[i];
-            
-            const percentSpan = document.createElement("span");
-            percentSpan.className = "class-percent";
-            percentSpan.innerText = "0%";
+            <h2 class="h5 pb-2 mb-3 border-bottom fw-bold text-dark">1. Controls Panel</h2>
+            <div class="mb-4">
+                <button type="button" id="btn-start" class="btn text-white px-4 fw-bold me-2 shadow-sm" style="background-color: #bf1e2e;">Start Microphone & Game</button>
+                <button type="button" id="btn-stop" class="btn btn-dark px-4 fw-bold shadow-sm">Stop</button>
+            </div>
 
-            labelHeader.appendChild(nameSpan);
-            labelHeader.appendChild(percentSpan);
+            <div class="row g-4 mt-2">
+                <div class="col-sm-6 text-center">
+                    <div class="text-uppercase small fw-bold tracking-wider text-secondary mb-3">Audio Feed Status</div>
+                    <div id="audio-container" class="d-flex flex-column align-items-center justify-content-center border border-3 border-dark rounded bg-black text-white shadow-sm p-4">
+                        <div id="mic-icon" class="fs-1">🎙️</div>
+                        <div id="audio-status" class="small text-muted mt-2">Microphone Off</div>
+                    </div>
+                </div>
+                
+                <div class="col-sm-6">
+                    <div class="text-uppercase small fw-bold tracking-wider text-secondary mb-3">Classification Accuracy</div>
+                    <div id="label-container">
+                        <div class="text-muted small fst-italic">Click Start to load the model...</div>
+                    </div>
+                </div>
+            </div>
 
-            const progressContainer = document.createElement("div");
-            progressContainer.className = "progress";
-            progressContainer.style.height = "14px";
+            <h2 class="h5 pb-2 mb-3 mt-5 border-bottom fw-bold text-dark">2. Sound Jump Game Control</h2>
+            <div class="text-center position-relative">
+                <div class="text-uppercase small fw-bold tracking-wider text-secondary mb-2">When Class 2 > 50%, the block jumps!</div>
+                <canvas id="gameCanvas" width="600" height="150" class="border border-2 border-dark rounded bg-white shadow-sm"></canvas>
+                
+                <div id="gameOverScreen" class="position-absolute top-50 start-50 translate-middle d-none text-center bg-white p-4 border border-3 border-dark rounded shadow-lg">
+                    <h3 class="text-danger fw-bold mb-1">Game Over</h3>
+                    <p class="mb-3 fw-bold">Score: <span id="finalScore" class="text-primary">0</span></p>
+                    <button type="button" id="btn-restart" class="btn btn-dark fw-bold px-4">Restart Game</button>
+                </div>
+            </div>
 
-            const progressBar = document.createElement("div");
-            progressBar.className = "progress-bar";
-            progressBar.style.backgroundColor = "#bf1e2e"; 
-            progressBar.style.width = "0%";
+        </div>
+    </div>
+</main>
 
-            progressContainer.appendChild(progressBar);
-            rowDiv.appendChild(labelHeader);
-            rowDiv.appendChild(progressContainer);
-            
-            labelContainer.appendChild(rowDiv);
-        }
-    }
-
-    // Listen to incoming sound stream
-    recognizer.listen(result => {
-        const scores = result.scores; 
-        if (!labelContainer) return;
-        
-        for (let i = 0; i < maxPredictions; i++) {
-            const rowDiv = labelContainer.childNodes[i];
-            if (!rowDiv) continue;
-            
-            const percentSpan = rowDiv.querySelector(".class-percent");
-            const progressBar = rowDiv.querySelector(".progress-bar");
-            
-            const probability = scores[i];
-            if (percentSpan) percentSpan.innerText = (probability * 100).toFixed(0) + "%";
-            if (progressBar) progressBar.style.width = (probability * 100) + "%";
-
-            if (i === 1 && probability > 0.50) {
-                dinoJump();
-            }
-        }
-    }, {
-        includeSpectrogram: true,
-        probabilityThreshold: 0.70,
-        invokeCallbackOnNoiseAndUnknown: true,
-        overlapFactor: 0.50
-    });
-
-    if (!gameRunning) {
-        restartGame();
-    }
-}
-
-async function stop() {
-    if (recognizer && recognizer.isListening()) {
-        await recognizer.stopListening();
-    }
-    const startBtn = document.getElementById('btn-start');
-    if (startBtn) {
-        startBtn.innerText = "Start Microphone & Game";
-        startBtn.style.backgroundColor = "#bf1e2e";
-    }
-    const micIcon = document.getElementById('mic-icon');
-    if (micIcon) micIcon.style.animation = "none";
-    
-    const statusText = document.getElementById('audio-status');
-    if (statusText) {
-        statusText.innerText = "Microphone Off";
-        statusText.className = "small text-muted mt-2";
-    }
-    gameRunning = false; 
-}
-
-// ---------------------------------------------------------
-// 2. DINOSAUR GAME PHYSICS FRAMEWORK
-// ---------------------------------------------------------
-function gameLoop() {
-    if (!gameRunning) return;
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    dino.dy += dino.gravity;
-    dino.y += dino.dy;
-
-    if (dino.y + dino.h >= canvas.height - 10) {
-        dino.y = canvas.height - dino.h - 10;
-        dino.dy = 0;
-        dino.grounded = true;
-    }
-
-    ctx.fillStyle = '#bf1e2e';
-    ctx.fillRect(dino.x, dino.y, dino.w, dino.h);
-
-    frames++;
-    
-    if (frames % Math.floor(Math.random() * 50 + 70) === 0) {
-        obstacles.push({
-            x: canvas.width,
-            y: canvas.height - 40,
-            w: 20,
-            h: 30,
-            speed: 6
-        });
-    }
-
-    for (let i = 0; i < obstacles.length; i++) {
-        let obs = obstacles[i];
-        obs.x -= obs.speed;
-        
-        ctx.fillStyle = '#1a1a1a'; 
-        ctx.fillRect(obs.x, obs.y, obs.w, obs.h);
-
-        if (
-            dino.x < obs.x + obs.w &&
-            dino.x + dino.w > obs.x &&
-            dino.y < obs.y + obs.h &&
-            dino.y + dino.h > obs.y
-        ) {
-            gameOver();
-        }
-    }
-
-    obstacles = obstacles.filter(obs => obs.x + obs.w > 0);
-
-    score++;
-    ctx.fillStyle = '#000000';
-    ctx.font = 'bold 16px Arial';
-    ctx.fillText('Score: ' + Math.floor(score / 10), canvas.width - 100, 30);
-
-    ctx.beginPath();
-    ctx.moveTo(0, canvas.height - 10);
-    ctx.lineTo(canvas.width, canvas.height - 10);
-    ctx.stroke();
-
-    requestAnimationFrame(gameLoop);
-}
-
-function dinoJump() {
-    if (dino.grounded && gameRunning) {
-        dino.dy = -dino.jumpPower;
-        dino.grounded = false;
-    }
-}
-
-function gameOver() {
-    gameRunning = false;
-    const overlay = document.getElementById('gameOverScreen');
-    if (overlay) overlay.classList.remove('d-none');
-    
-    const scoreVal = document.getElementById('finalScore');
-    if (scoreVal) scoreVal.innerText = Math.floor(score / 10);
-}
-
-function restartGame() {
-    dino.y = 110;
-    dino.dy = 0;
-    obstacles = [];
-    score = 0;
-    frames = 0;
-    
-    const overlay = document.getElementById('gameOverScreen');
-    if (overlay) overlay.classList.add('d-none');
-    
-    gameRunning = true;
-    gameLoop();
-}
-
-// Clean event mapping layout
-document.getElementById('btn-start').addEventListener('click', init);
-document.getElementById('btn-stop').addEventListener('click', stop);
-document.getElementById('btn-restart').addEventListener('click', restartGame);
+<script src="
