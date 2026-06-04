@@ -17,7 +17,7 @@ let dino = {
     w: 20,
     h: 40,
     dy: 0,
-    jumpPower: 10,
+    jumpPower: 11,
     gravity: 0.6,
     grounded: true
 };
@@ -25,108 +25,106 @@ let dino = {
 // ---------------------------------------------------------
 // 1. SPEECH COMMAND / AUDIO MODEL PROCESSING LOGIC
 // ---------------------------------------------------------
-async function init() {
-    // FORCE COLOR SHIFT IMMEDIATELY
-    document.getElementById('btn-start').innerText = "Connecting...";
-    document.getElementById('btn-start').style.backgroundColor = "#e0a800"; 
+async function createModel() {
+    // Standard absolute local path loader pointing straight to your repository files
+    const URL = "./"; 
+    const checkpointURL = URL + "model.json"; 
+    const metadataURL = URL + "metadata.json"; 
 
-    document.getElementById('audio-status').innerText = "Loading model...";
-    document.getElementById('audio-status').className = "small text-warning fw-bold mt-2";
+    const recognizer = speechCommands.create(
+        "BROWSER_FFT", 
+        undefined, 
+        checkpointURL,
+        metadataURL
+    );
+
+    await recognizer.ensureModelLoaded();
+    return recognizer;
+}
+
+async function init() {
+    // Dynamic theme state shift updates upon mouse click trigger
+    const startBtn = document.getElementById('btn-start');
+    const statusText = document.getElementById('audio-status');
+    
+    if (startBtn) {
+        startBtn.innerText = "Connecting...";
+        startBtn.style.backgroundColor = "#f0b232"; // Discord Warning Yellow
+        startBtn.style.color = "#1e1f22";
+    }
+    if (statusText) {
+        statusText.innerText = "Reading model structural files...";
+        statusText.style.color = "#f0b232";
+    }
 
     try {
-        const modelURL = "./model.json";
-        const metadataURL = "./metadata.json";
-
-        // Create Google Speech framework natively
-        recognizer = speechCommands.create(
-            "BROWSER_FFT", 
-            undefined, 
-            modelURL, 
-            metadataURL
-        );
-
-        // Load files natively
-        await recognizer.ensureModelLoaded();
+        // Execute clean local module fetch parameters
+        recognizer = await createModel();
         maxPredictions = recognizer.wordLabels().length;
 
     } catch (error) {
-        alert("Loading Error:\n" + error.message);
-        document.getElementById('btn-start').innerText = "Start Microphone & Game";
-        document.getElementById('btn-start').style.backgroundColor = "#bf1e2e";
-        document.getElementById('audio-status').innerText = "Failed to launch";
-        document.getElementById('audio-status').className = "small text-muted mt-2";
+        alert("Launch Roadblock encountered:\n" + error.message + "\n\nDouble check that model.json, metadata.json, and weights.bin are all completely unzipped and present inside your main folder.");
+        resetButtons();
         return;
     }
 
-    // Update Status Indicators on Success
-    document.getElementById('btn-start').innerText = "Model Active";
-    document.getElementById('btn-start').style.backgroundColor = "#28a745"; 
-
-    document.getElementById('mic-icon').style.animation = "pulse 1.5s infinite";
-    document.getElementById('audio-status').innerText = "Listening...";
-    document.getElementById('audio-status').className = "small text-danger fw-bold mt-2";
+    // Success styling updates matching active layout profile
+    if (startBtn) {
+        startBtn.innerText = "Model Active";
+        startBtn.style.backgroundColor = "#23a55a"; // Discord Success Green
+        startBtn.style.color = "#ffffff";
+    }
+    
+    const micIcon = document.getElementById('mic-icon');
+    if (micIcon) micIcon.style.animation = "pulse 1.5s infinite";
+    
+    if (statusText) {
+        statusText.innerText = "Streaming Audio... Listening";
+        statusText.style.color = "#23a55a";
+    }
 
     labelContainer = document.getElementById("label-container");
     labelContainer.innerHTML = "";
-    const classNames = recognizer.wordLabels();
+    const classLabels = recognizer.wordLabels();
 
+    // Dynamically build accuracy panels styled around Discord dark palette properties
     for (let i = 0; i < maxPredictions; i++) {
         const rowDiv = document.createElement("div");
         rowDiv.className = "mb-3";
-
-        const labelHeader = document.createElement("div");
-        labelHeader.className = "d-flex justify-content-between mb-1 small fw-bold text-secondary";
-        
-        const nameSpan = document.createElement("span");
-        nameSpan.innerText = classNames[i];
-        
-        const percentSpan = document.createElement("span");
-        percentSpan.className = "class-percent";
-        percentSpan.innerText = "0%";
-
-        labelHeader.appendChild(nameSpan);
-        labelHeader.appendChild(percentSpan);
-
-        const progressContainer = document.createElement("div");
-        progressContainer.className = "progress";
-        progressContainer.style.height = "14px";
-
-        const progressBar = document.createElement("div");
-        progressBar.className = "progress-bar";
-        progressBar.style.backgroundColor = "#bf1e2e"; 
-        progressBar.style.width = "0%";
-
-        progressContainer.appendChild(progressBar);
-        rowDiv.appendChild(labelHeader);
-        rowDiv.appendChild(progressContainer);
-        
+        rowDiv.innerHTML = `
+            <div class="d-flex justify-content-between small fw-bold mb-1">
+                <span style="color: #dbdee1;">${classLabels[i]}</span>
+                <span class="class-percent" style="color: #949ba4;">0%</span>
+            </div>
+            <div class="progress" style="height: 10px;">
+                <div class="progress-bar" style="width: 0%; background-color: #5865f2;"></div>
+            </div>
+        `;
         labelContainer.appendChild(rowDiv);
     }
 
-    // Monitor microphone stream frequencies
+    // Connect to active audio hardware arrays natively
     recognizer.listen(result => {
         const scores = result.scores; 
-        
         for (let i = 0; i < maxPredictions; i++) {
             const rowDiv = labelContainer.childNodes[i];
-            if (!rowDiv) continue;
-            
             const percentSpan = rowDiv.querySelector(".class-percent");
             const progressBar = rowDiv.querySelector(".progress-bar");
             
             const probability = scores[i];
-            if (percentSpan) percentSpan.innerText = (probability * 100).toFixed(0) + "%";
-            if (progressBar) progressBar.style.width = (probability * 100) + "%";
+            percentSpan.innerText = (probability * 100).toFixed(0) + "%";
+            progressBar.style.width = (probability * 100) + "%";
 
-            if (i === 1 && probability > 0.50) {
+            // If probability match passes 75% bar limits on Class 2 (Index 1), trigger game physical jump
+            if (i === 1 && probability > 0.75) {
                 dinoJump();
             }
         }
     }, {
-        includeSpectrogram: true,
-        probabilityThreshold: 0.70,
+        includeSpectrogram: true, 
+        probabilityThreshold: 0.75,
         invokeCallbackOnNoiseAndUnknown: true,
-        overlapFactor: 0.50
+        overlapFactor: 0.50 
     });
 
     if (!gameRunning) {
@@ -134,15 +132,28 @@ async function init() {
     }
 }
 
+function resetButtons() {
+    const startBtn = document.getElementById('btn-start');
+    if (startBtn) {
+        startBtn.innerText = "Start Microphone & Game";
+        startBtn.style.backgroundColor = "#5865f2"; 
+        startBtn.style.color = "#ffffff";
+    }
+    const micIcon = document.getElementById('mic-icon');
+    if (micIcon) micIcon.style.animation = "none";
+    
+    const statusText = document.getElementById('audio-status');
+    if (statusText) {
+        statusText.innerText = "Microphone Off";
+        statusText.style.color = "#949ba4";
+    }
+}
+
 async function stop() {
     if (recognizer && recognizer.isListening()) {
         await recognizer.stopListening();
     }
-    document.getElementById('btn-start').innerText = "Start Microphone & Game";
-    document.getElementById('btn-start').style.backgroundColor = "#bf1e2e";
-    document.getElementById('mic-icon').style.animation = "none";
-    document.getElementById('audio-status').innerText = "Microphone Off";
-    document.getElementById('audio-status').className = "small text-muted mt-2";
+    resetButtons();
     gameRunning = false; 
 }
 
@@ -151,9 +162,11 @@ async function stop() {
 // ---------------------------------------------------------
 function gameLoop() {
     if (!gameRunning) return;
-
+    
+    // Clear field canvas with dark panel background color definition
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+    // Gravity calculation physics values
     dino.dy += dino.gravity;
     dino.y += dino.dy;
 
@@ -163,45 +176,42 @@ function gameLoop() {
         dino.grounded = true;
     }
 
-    ctx.fillStyle = '#bf1e2e';
+    // Render Player Block using sharp contrast white accent
+    ctx.fillStyle = '#ffffff';
     ctx.fillRect(dino.x, dino.y, dino.w, dino.h);
 
     frames++;
-    
-    if (frames % Math.floor(Math.random() * 50 + 70) === 0) {
-        obstacles.push({
-            x: canvas.width,
-            y: canvas.height - 40,
-            w: 20,
-            h: 30,
-            speed: 6
-        });
+    if (frames % 90 === 0) {
+        // Red color blocks for obstacles tracking movement
+        obstacles.push({ x: canvas.width, y: canvas.height - 35, w: 15, h: 25, speed: 5 });
     }
 
     for (let i = 0; i < obstacles.length; i++) {
         let obs = obstacles[i];
         obs.x -= obs.speed;
         
-        ctx.fillStyle = '#1a1a1a'; 
+        ctx.fillStyle = '#da373c';  /* Discord Alert Red obstacle fill color */
         ctx.fillRect(obs.x, obs.y, obs.w, obs.h);
 
-        if (
-            dino.x < obs.x + obs.w &&
-            dino.x + dino.w > obs.x &&
-            dino.y < obs.y + obs.h &&
-            dino.y + dino.h > obs.y
-        ) {
-            gameOver();
+        // Crash intercept evaluation mechanics
+        if (dino.x < obs.x + obs.w && dino.x + dino.w > obs.x && dino.y < obs.y + obs.h && dino.y + dino.h > obs.y) {
+            gameRunning = false;
+            document.getElementById('gameOverScreen').classList.remove('d-none');
+            document.getElementById('finalScore').innerText = Math.floor(score / 10);
         }
     }
 
     obstacles = obstacles.filter(obs => obs.x + obs.w > 0);
-
     score++;
-    ctx.fillStyle = '#000000';
-    ctx.font = 'bold 16px Arial';
-    ctx.fillText('Score: ' + Math.floor(score / 10), canvas.width - 100, 30);
+    
+    // Render text metrics output onto the dark engine layer
+    ctx.fillStyle = '#dbdee1';
+    ctx.font = 'bold 14px Segoe UI, Arial';
+    ctx.fillText('Score: ' + Math.floor(score / 10), canvas.width - 90, 25);
 
+    // Draw bottom ground line separator boundary axis line
+    ctx.strokeStyle = '#4e5058';
+    ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(0, canvas.height - 10);
     ctx.lineTo(canvas.width, canvas.height - 10);
@@ -217,12 +227,6 @@ function dinoJump() {
     }
 }
 
-function gameOver() {
-    gameRunning = false;
-    document.getElementById('gameOverScreen').classList.remove('d-none');
-    document.getElementById('finalScore').innerText = Math.floor(score / 10);
-}
-
 function restartGame() {
     dino.y = 110;
     dino.dy = 0;
@@ -234,7 +238,7 @@ function restartGame() {
     gameLoop();
 }
 
-// BIND DIRECTLY RIGHT NOW
+// Bind engine variables directly to click hooks natively
 document.getElementById('btn-start').onclick = init;
 document.getElementById('btn-stop').onclick = stop;
 document.getElementById('btn-restart').onclick = restartGame;
