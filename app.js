@@ -26,8 +26,9 @@ let dino = {
 // 1. SPEECH COMMAND / AUDIO MODEL PROCESSING LOGIC
 // ---------------------------------------------------------
 async function createModel() {
-    // Standard absolute local path loader pointing straight to your repository files
-    const URL = "./"; 
+    // FIXED: Plugs in your exact live repository path to satisfy the strict HTTPS rule!
+    const URL = "https://bahbeee.github.io/Brett-s-Jumping-Time/"; 
+    
     const checkpointURL = URL + "model.json"; 
     const metadataURL = URL + "metadata.json"; 
 
@@ -43,7 +44,6 @@ async function createModel() {
 }
 
 async function init() {
-    // Dynamic theme state shift updates upon mouse click trigger
     const startBtn = document.getElementById('btn-start');
     const statusText = document.getElementById('audio-status');
     
@@ -58,7 +58,6 @@ async function init() {
     }
 
     try {
-        // Execute clean local module fetch parameters
         recognizer = await createModel();
         maxPredictions = recognizer.wordLabels().length;
 
@@ -87,7 +86,6 @@ async function init() {
     labelContainer.innerHTML = "";
     const classLabels = recognizer.wordLabels();
 
-    // Dynamically build accuracy panels styled around Discord dark palette properties
     for (let i = 0; i < maxPredictions; i++) {
         const rowDiv = document.createElement("div");
         rowDiv.className = "mb-3";
@@ -103,7 +101,6 @@ async function init() {
         labelContainer.appendChild(rowDiv);
     }
 
-    // Connect to active audio hardware arrays natively
     recognizer.listen(result => {
         const scores = result.scores; 
         for (let i = 0; i < maxPredictions; i++) {
@@ -115,7 +112,7 @@ async function init() {
             percentSpan.innerText = (probability * 100).toFixed(0) + "%";
             progressBar.style.width = (probability * 100) + "%";
 
-            // If probability match passes 75% bar limits on Class 2 (Index 1), trigger game physical jump
+            // Trigger physical jump when custom sound (Index 1) passes 75% accuracy
             if (i === 1 && probability > 0.75) {
                 dinoJump();
             }
@@ -139,106 +136,3 @@ function resetButtons() {
         startBtn.style.backgroundColor = "#5865f2"; 
         startBtn.style.color = "#ffffff";
     }
-    const micIcon = document.getElementById('mic-icon');
-    if (micIcon) micIcon.style.animation = "none";
-    
-    const statusText = document.getElementById('audio-status');
-    if (statusText) {
-        statusText.innerText = "Microphone Off";
-        statusText.style.color = "#949ba4";
-    }
-}
-
-async function stop() {
-    if (recognizer && recognizer.isListening()) {
-        await recognizer.stopListening();
-    }
-    resetButtons();
-    gameRunning = false; 
-}
-
-// ---------------------------------------------------------
-// 2. DINOSAUR GAME PHYSICS FRAMEWORK
-// ---------------------------------------------------------
-function gameLoop() {
-    if (!gameRunning) return;
-    
-    // Clear field canvas with dark panel background color definition
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // Gravity calculation physics values
-    dino.dy += dino.gravity;
-    dino.y += dino.dy;
-
-    if (dino.y + dino.h >= canvas.height - 10) {
-        dino.y = canvas.height - dino.h - 10;
-        dino.dy = 0;
-        dino.grounded = true;
-    }
-
-    // Render Player Block using sharp contrast white accent
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(dino.x, dino.y, dino.w, dino.h);
-
-    frames++;
-    if (frames % 90 === 0) {
-        // Red color blocks for obstacles tracking movement
-        obstacles.push({ x: canvas.width, y: canvas.height - 35, w: 15, h: 25, speed: 5 });
-    }
-
-    for (let i = 0; i < obstacles.length; i++) {
-        let obs = obstacles[i];
-        obs.x -= obs.speed;
-        
-        ctx.fillStyle = '#da373c';  /* Discord Alert Red obstacle fill color */
-        ctx.fillRect(obs.x, obs.y, obs.w, obs.h);
-
-        // Crash intercept evaluation mechanics
-        if (dino.x < obs.x + obs.w && dino.x + dino.w > obs.x && dino.y < obs.y + obs.h && dino.y + dino.h > obs.y) {
-            gameRunning = false;
-            document.getElementById('gameOverScreen').classList.remove('d-none');
-            document.getElementById('finalScore').innerText = Math.floor(score / 10);
-        }
-    }
-
-    obstacles = obstacles.filter(obs => obs.x + obs.w > 0);
-    score++;
-    
-    // Render text metrics output onto the dark engine layer
-    ctx.fillStyle = '#dbdee1';
-    ctx.font = 'bold 14px Segoe UI, Arial';
-    ctx.fillText('Score: ' + Math.floor(score / 10), canvas.width - 90, 25);
-
-    // Draw bottom ground line separator boundary axis line
-    ctx.strokeStyle = '#4e5058';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(0, canvas.height - 10);
-    ctx.lineTo(canvas.width, canvas.height - 10);
-    ctx.stroke();
-
-    requestAnimationFrame(gameLoop);
-}
-
-function dinoJump() {
-    if (dino.grounded && gameRunning) {
-        dino.dy = -dino.jumpPower;
-        dino.grounded = false;
-    }
-}
-
-function restartGame() {
-    dino.y = 110;
-    dino.dy = 0;
-    obstacles = [];
-    score = 0;
-    frames = 0;
-    document.getElementById('gameOverScreen').classList.add('d-none');
-    gameRunning = true;
-    gameLoop();
-}
-
-// Bind engine variables directly to click hooks natively
-document.getElementById('btn-start').onclick = init;
-document.getElementById('btn-stop').onclick = stop;
-document.getElementById('btn-restart').onclick = restartGame;
