@@ -99,6 +99,7 @@ async function init() {
         labelContainer.appendChild(rowDiv);
     }
 
+// High-velocity audio monitoring stream
     recognizer.listen(result => {
         const scores = result.scores; 
         for (let i = 0; i < maxPredictions; i++) {
@@ -110,16 +111,16 @@ async function init() {
             percentSpan.innerText = (probability * 100).toFixed(0) + "%";
             progressBar.style.width = (probability * 100) + "%";
 
-            // Trigger physical jump when custom sound (Index 1) passes 75% accuracy
-            if (i === 1 && probability > 0.75) {
+            // PERFORMANCE TWEAK: Dropped confidence threshold to 60% for a hair-trigger jump
+            if (i === 1 && probability > 0.60) {
                 dinoJump();
             }
         }
     }, {
         includeSpectrogram: true, 
-        probabilityThreshold: 0.75,
+        probabilityThreshold: 0.60, // Lowered from 0.75 for instant activation
         invokeCallbackOnNoiseAndUnknown: true,
-        overlapFactor: 0.50 
+        overlapFactor: 0.70 // Increased from 0.50 to make the mic scan way faster
     });
 
     if (!gameRunning) {
